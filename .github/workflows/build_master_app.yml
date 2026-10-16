@@ -1,488 +1,561 @@
 name: Master App Builder & APK Compiler
 
 on:
-  workflow_dispatch:
-    inputs:
-      project_name:
-        description: 'Project Name (snake_case)'
-        required: true
-        type: string
-        default: 'simple_app_builder'
-      package_name:
-        description: 'Android Package Name (e.g. com.builder.app)'
-        required: true
-        type: string
-        default: 'com.builder.simpleapp'
+workflow_dispatch:
+inputs:
+project_name:
+description: 'Project Name (snake_case)'
+required: true
+type: string
+default: 'simple_app_builder'
+package_name:
+description: 'Android Package Name (e.g. com.builder.app)'
+required: true
+type: string
+default: 'com.builder.simpleapp'
 
 jobs:
-  scaffold-and-build:
-    runs-on: ubuntu-latest
+scaffold-and-build:
+runs-on: ubuntu-latest
 
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
+steps:
+  - name: Checkout Repository
+    uses: actions/checkout@v4
 
-      - name: Set up Java (Zulu 17)
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'zulu'
-          java-version: '17'
+  - name: Set up Java (Zulu 17)
+    uses: actions/setup-java@v4
+    with:
+      distribution: 'zulu'
+      java-version: '17'
 
-      - name: Set up Flutter Stable
-        uses: subosito/flutter-action@v2
-        with:
-          channel: 'stable'
-          cache: true
+  - name: Set up Flutter Stable
+    uses: subosito/flutter-action@v2
+    with:
+      flutter-version: '3.19.6'
+      channel: 'stable'
+      cache: true
 
-      - name: Scaffold Flutter Project & Directories
-        run: |
-          flutter create . --org ${{ inputs.package_name }} --project-name ${{ inputs.project_name }} --platforms=android
-          mkdir -p lib/models lib/services lib/screens
+  - name: Scaffold Flutter Project & Directories
+    run: |
+      flutter create . --org ${{ inputs.package_name }} --project-name${{ inputs.project_name }} --platforms=android
+      mkdir -p lib/models lib/services lib/screens
 
-      - name: Write pubspec.yaml
-        run: |
-          cat << 'EOF' > pubspec.yaml
-          name: ${{ inputs.project_name }}
-          description: "A production-grade Simple App Builder mobile application."
-          publish_to: "none"
-          version: 1.0.0+1
+  - name: Write pubspec.yaml
+    run: |
+      cat << 'EOF' > pubspec.yaml
+      name: ${{ inputs.project_name }}
+      description: "A production-grade Simple App Builder mobile application."
+      publish_to: "none"
+      version: 1.0.0+1
 
-          environment:
-            sdk: '>=3.0.0 <4.0.0'
+      environment:
+        sdk: '>=3.0.0 <4.0.0'
 
-          dependencies:
-            flutter:
-              sdk: flutter
-            flutter_secure_storage: ^9.0.0
-            shared_preferences: ^2.2.3
-            http: ^1.2.0
-            provider: ^6.1.2
-            file_picker: ^8.0.0
-            path_provider: ^2.1.2
+      dependencies:
+        flutter:
+          sdk: flutter
+        flutter_secure_storage: ^9.0.0
+        shared_preferences: ^2.2.3
+        http: ^1.2.0
+        provider: ^6.1.2
+        file_picker: ^8.0.0
+        path_provider: ^2.1.2
 
-          dev_dependencies:
-            flutter_test:
-              sdk: flutter
-            flutter_lints: ^3.0.0
+      dev_dependencies:
+        flutter_test:
+          sdk: flutter
+        flutter_lints: ^3.0.0
 
-          flutter:
-            uses-material-design: true
-          EOF
+      flutter:
+        uses-material-design: true
+      EOF
 
-      - name: Write GitHub Account Model (lib/models/github_account.dart)
-        run: |
-          cat << 'EOF' > lib/models/github_account.dart
-          class GithubAccount {
-            final String username;
-            final String token;
-            final String repository;
+  - name: Write GitHub Account Model (lib/models/github_account.dart)
+    run: |
+      cat << 'EOF' > lib/models/github_account.dart
+      class GithubAccount {
+        final String username;
+        final String token;
+        final String repository;
 
-            GithubAccount({
-              required this.username,
-              required this.token,
-              required this.repository,
-            });
+        GithubAccount({
+          required this.username,
+          required this.token,
+          required this.repository,
+        });
 
-            Map<String, dynamic> toJson() => {
-                  'username': username,
-                  'token': token,
-                  'repository': repository,
-                };
+        Map<String, dynamic> toJson() => {
+              'username': username,
+              'token': token,
+              'repository': repository,
+            };
 
-            factory GithubAccount.fromJson(Map<String, dynamic> json) => GithubAccount(
-                  username: json['username'],
-                  token: json['token'],
-                  repository: json['repository'],
-                );
-          }
-          EOF
+        factory GithubAccount.fromJson(Map<String, dynamic> json) => GithubAccount(
+              username: json['username'],
+              token: json['token'],
+              repository: json['repository'],
+            );
+      }
+      EOF
 
-      - name: Write GitHub API Service (lib/services/github_api_service.service.dart)
-        run: |
-          cat << 'EOF' > lib/services/github_api_service.service.dart
-          import 'dart:convert';
-          import 'package:http/http.dart' as http;
-          import '../models/github_account.dart';
+  - name: Write GitHub API Service (lib/services/github_api_service.service.dart)
+    run: |
+      cat << 'EOF' > lib/services/github_api_service.service.dart
+      import 'dart:convert';
+      import 'package:http/http.dart' as http;
+      import '../models/github_account.dart';
 
-          class GithubApiService {
-            static Future<bool> triggerWorkflowWithFailover({
-              required List<GithubAccount> accounts,
-              required String projectName,
-              required String packageName,
-              required String dartCode,
-              required Function(String) onAccountSwitch,
-            }) async {
-              for (int i = 0; i < accounts.length; i++) {
-                final account = accounts[i];
-                try {
-                  onAccountSwitch('Attempting build with account: ${account.username}...');
-                  
-                  final url = Uri.parse(
-                      'https://api.github.com/repos/${account.repository}/actions/workflows/build_apk.yml/dispatches');
+      class GithubApiService {
+        static Future<bool> triggerWorkflowWithFailover({
+          required List<GithubAccount> accounts,
+          required String projectName,
+          required String packageName,
+          required String dartCode,
+          required Function(String) onAccountSwitch,
+        }) async {
+          for (int i = 0; i < accounts.length; i++) {
+            final account = accounts[i];
+            try {
+              onAccountSwitch('Attempting build with account: ${account.username}...');
+              
+              final url = Uri.parse(
+                  'https://api.github.com/repos/${account.repository}/actions/workflows/build_apk.yml/dispatches');
 
-                  final response = await http.post(
-                    url,
-                    headers: {
-                      'Authorization': 'Bearer ${account.token}',
-                      'Accept': 'application/vnd.github+json',
-                      'X-GitHub-Api-Version': '2022-11-28',
-                      'Content-Type': 'application/json',
-                    },
-                    body: jsonEncode({
-                      'ref': 'main',
-                      'inputs': {
-                        'project_name': projectName,
-                        'package_name': packageName,
-                        'dart_code': dartCode,
-                      },
-                    }),
-                  );
-
-                  if (response.statusCode == 204) {
-                    return true;
-                  } else if (response.statusCode == 401 || 
-                             response.statusCode == 403 || 
-                             response.statusCode == 429) {
-                    onAccountSwitch('Account ${account.username} hit rate-limit or auth error (${response.statusCode}). Failing over...');
-                    continue;
-                  } else {
-                    throw Exception('Failed to trigger workflow: ${response.body}');
-                  }
-                } catch (e) {
-                  if (i == accounts.length - 1) rethrow;
-                  onAccountSwitch('Error with ${account.username}: $e. Trying next account...');
-                }
-              }
-              return false;
-            }
-          }
-          EOF
-
-      - name: Write Setup Screen (lib/screens/setup_screen.dart)
-        run: |
-          cat << 'EOF' > lib/screens/setup_screen.dart
-          import 'package:flutter/material.dart';
-          import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-          import 'dashboard_screen.dart';
-
-          class SetupScreen extends StatefulWidget {
-            const SetupScreen({super.key});
-
-            @override
-            State<SetupScreen> createState() => _SetupScreenState();
-          }
-
-          class _SetupScreenState extends State<SetupScreen> {
-            final _usernameController = TextEditingController();
-            final _tokenController = TextEditingController();
-            final _repoController = TextEditingController();
-            final _storage = const FlutterSecureStorage();
-            bool _isLoading = false;
-
-            Future<void> _saveCredentials() async {
-              setState(() => _isLoading = true);
-              await _storage.write(key: 'gh_username', value: _usernameController.text.trim());
-              await _storage.write(key: 'gh_token', value: _tokenController.text.trim());
-              await _storage.write(key: 'gh_repo', value: _repoController.text.trim());
-
-              if (!mounted) return;
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (_) => const DashboardScreen()),
+              final response = await http.post(
+                url,
+                headers: {
+                  'Authorization': 'Bearer ${account.token}',
+                  'Accept': 'application/vnd.github+json',
+                  'X-GitHub-Api-Version': '2022-11-28',
+                  'Content-Type': 'application/json',
+                },
+                body: jsonEncode({
+                  'ref': 'main',
+                  'inputs': {
+                    'project_name': projectName,
+                    'package_name': packageName,
+                    'dart_code': dartCode,
+                  },
+                }),
               );
-            }
 
-            @override
-            Widget build(BuildContext context) {
-              return Scaffold(
-                appBar: AppBar(title: const Text('Initial Setup & Credentials')),
-                body: SingleChildScrollView(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+              if (response.statusCode == 204) {
+                return true;
+              } else if (response.statusCode == 401 || 
+                         response.statusCode == 403 || 
+                         response.statusCode == 429) {
+                onAccountSwitch('Account ${account.username} hit rate-limit or auth error (${response.statusCode}). Failing over...');
+                continue;
+              } else {
+                throw Exception('Failed to trigger workflow: ${response.body}');
+              }
+            } catch (e) {
+              if (i == accounts.length - 1) rethrow;
+              onAccountSwitch('Error with ${account.username}:$e. Trying next account...');
+            }
+          }
+          return false;
+        }
+      }
+      EOF
+
+  - name: Write Setup Screen (lib/screens/setup_screen.dart)
+    run: |
+      cat << 'EOF' > lib/screens/setup_screen.dart
+      import 'package:flutter/material.dart';
+      import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+      import 'dashboard_screen.dart';
+
+      class SetupScreen extends StatefulWidget {
+        const SetupScreen({super.key});
+
+        @override
+        State<SetupScreen> createState() => _SetupScreenState();
+      }
+
+      class _SetupScreenState extends State<SetupScreen> {
+        final _usernameController = TextEditingController();
+        final _tokenController = TextEditingController();
+        final _repoController = TextEditingController();
+        final _storage = const FlutterSecureStorage();
+        bool _isLoading = false;
+
+        Future<void> _saveCredentials() async {
+          setState(() => _isLoading = true);
+          await _storage.write(key: 'gh_username', value: _usernameController.text.trim());
+          await _storage.write(key: 'gh_token', value: _tokenController.text.trim());
+          await _storage.write(key: 'gh_repo', value: _repoController.text.trim());
+
+          if (!mounted) return;
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const DashboardScreen()),
+          );
+        }
+
+        @override
+        Widget build(BuildContext context) {
+          return Scaffold(
+            appBar: AppBar(title: const Text('Initial Setup & Credentials')),
+            body: SingleChildScrollView(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Welcome to Simple App Builder!',
+                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'To compile your apps in the cloud, please configure your GitHub Personal Access Token (PAT).',
+                    style: TextStyle(color: Colors.grey),
+                  ),
+                  const SizedBox(height: 20),
+                  ExpansionTile(
+                    title: const Text('How to create a Classic GitHub PAT'),
                     children: [
-                      const Text(
-                        'Welcome to Simple App Builder!',
-                        style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(height: 8),
-                      const Text(
-                        'To compile your apps in the cloud, please configure your GitHub Personal Access Token (PAT).',
-                        style: TextStyle(color: Colors.grey),
-                      ),
-                      const SizedBox(height: 20),
-                      ExpansionTile(
-                        title: const Text('How to create a Classic GitHub PAT'),
-                        children: [
-                          Padding(
-                            padding: const EdgeInsets.all(8.0),
-                            child: Text(
-                              '1. Go to GitHub Settings -> Developer Settings -> Personal Access Tokens -> Tokens (classic).\n'
-                              '2. Generate new token (classic).\n'
-                              '3. Explicitly check the following scopes:\n'
-                              '   - repo (Full control of private repositories)\n'
-                              '   - workflow (Update GitHub Action workflows)\n'
-                              '4. Copy the generated token and paste it below.',
-                              style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.secondary),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 20),
-                      TextField(
-                        controller: _usernameController,
-                        decoration: const InputDecoration(labelText: 'GitHub Username', border: OutlineInputBorder()),
-                      ),
-                      const SizedBox(height: 12),
-                      TextField(
-                        controller: _tokenController,
-                        decoration: const InputDecoration(labelText: 'GitHub PAT (Classic)', border: OutlineInputBorder()),
-                        obscureText: true,
-                      ),
-                      const SizedBox(height: 12),
-                      TextField(
-                        controller: _repoController,
-                        decoration: const InputDecoration(labelText: 'Repository (owner/repo-name)', border: OutlineInputBorder()),
-                      ),
-                      const SizedBox(height: 24),
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          onPressed: _isLoading ? null : _saveCredentials,
-                          child: const Text('Save & Continue'),
+                      Padding(
+                        padding: const EdgeInsets.all(8.0),
+                        child: Text(
+                          '1. Go to GitHub Settings -> Developer Settings -> Personal Access Tokens -> Tokens (classic).\\n'
+                          '2. Generate new token (classic).\\n'
+                          '3. Explicitly check the following scopes:\\n'
+                          '   - repo (Full control of private repositories)\\n'
+                          '   - workflow (Update GitHub Action workflows)\\n'
+                          '4. Copy the generated token and paste it below.',
+                          style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.secondary),
                         ),
                       ),
                     ],
                   ),
+                  const SizedBox(height: 20),
+                  TextField(
+                    controller: _usernameController,
+                    decoration: const InputDecoration(labelText: 'GitHub Username', border: OutlineInputBorder()),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: _tokenController,
+                    decoration: const InputDecoration(labelText: 'GitHub PAT (Classic)', border: OutlineInputBorder()),
+                    obscureText: true,
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: _repoController,
+                    decoration: const InputDecoration(labelText: 'Repository (owner/repo-name)', border: OutlineInputBorder()),
+                  ),
+                  const SizedBox(height: 24),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: _isLoading ? null : _saveCredentials,
+                      child: const Text('Save & Continue'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+      }
+      EOF
+
+  - name: Write Dashboard Screen (lib/screens/dashboard_screen.dart)
+    run: |
+      cat << 'EOF' > lib/screens/dashboard_screen.dart
+      import 'package:flutter/material.dart';
+      import 'wizard_screen.dart';
+      import 'settings_screen.dart';
+      import 'editor_screen.dart';
+
+      class DashboardScreen extends StatelessWidget {
+        const DashboardScreen({super.key});
+
+        @override
+        Widget build(BuildContext context) {
+          return Scaffold(
+            appBar: AppBar(
+              title: const Text('App Builder Dashboard'),
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.code),
+                  onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const EditorScreen())),
+                  tooltip: 'Workflow & Code Editor',
                 ),
-              );
-            }
-          }
-          EOF
-
-      - name: Write Dashboard Screen (lib/screens/dashboard_screen.dart)
-        run: |
-          cat << 'EOF' > lib/screens/dashboard_screen.dart
-          import 'package:flutter/material.dart';
-          import 'wizard_screen.dart';
-          import 'settings_screen.dart';
-          import 'editor_screen.dart';
-
-          class DashboardScreen extends StatelessWidget {
-            const DashboardScreen({super.key});
-
-            @override
-            Widget build(BuildContext context) {
-              return Scaffold(
-                appBar: AppBar(
-                  title: const Text('App Builder Dashboard'),
-                  actions: [
-                    IconButton(
-                      icon: const Icon(Icons.code),
-                      onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const EditorScreen())),
-                      tooltip: 'Workflow & Code Editor',
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.settings),
-                      onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen())),
-                      tooltip: 'Multi-Account Settings',
-                    ),
-                  ],
+                IconButton(
+                  icon: const Icon(Icons.settings),
+                  onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen())),
+                  tooltip: 'Multi-Account Settings',
                 ),
-                body: ListView(
-                  padding: const EdgeInsets.all(16),
-                  children: [
-                    Card(
-                      child: ListTile(
-                        leading: const Icon(Icons.phone_android, color: Colors.blue, size: 40),
-                        title: const Text('My First Dynamic App'),
-                        subtitle: const Text('Package: com.builder.myfirstapp\nStatus: Ready to build'),
-                        trailing: IconButton(
-                          icon: const Icon(Icons.play_arrow),
-                          onPressed: () {},
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                floatingActionButton: FloatingActionButton(
-                  onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const WizardScreen())),
-                  child: const Icon(Icons.add),
-                ),
-              );
-            }
-          }
-          EOF
-
-      - name: Write Wizard Screen (lib/screens/wizard_screen.dart)
-        run: |
-          cat << 'EOF' > lib/screens/wizard_screen.dart
-          import 'package:flutter/material.dart';
-
-          class WizardScreen extends StatefulWidget {
-            const WizardScreen({super.key});
-
-            @override
-            State<WizardScreen> createState() => _WizardScreenState();
-          }
-
-          class _WizardScreenState extends State<WizardScreen> {
-            int _currentStep = 0;
-            final _nameController = TextEditingController(text: 'my_app');
-            final _packageController = TextEditingController(text: 'com.example.myapp');
-            String _dartCodeInput = "import 'package:flutter/material.dart';\n\nvoid main() => runApp(MaterialApp(home: Scaffold(body: Center(child: Text('Hello Simple App Builder!')))));";
-
-            @override
-            Widget build(BuildContext context) {
-              return Scaffold(
-                appBar: AppBar(title: const Text('New App Project Wizard')),
-                body: Stepper(
-                  currentStep: _currentStep,
-                  onStepContinue: () {
-                    if (_currentStep < 3) {
-                      setState(() => _currentStep += 1);
-                    } else {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Triggering GitHub Actions Compilation...')),
-                      );
-                    }
-                  },
-                  onStepCancel: () {
-                    if (_currentStep > 0) setState(() => _currentStep -= 1);
-                  },
-                  steps: [
-                    Step(
-                      title: const Text('Project & Package Name'),
-                      content: Column(
-                        children: [
-                          TextField(controller: _nameController, decoration: const InputDecoration(labelText: 'Project Name (snake_case)')),
-                          const SizedBox(height: 10),
-                          TextField(controller: _packageController, decoration: const InputDecoration(labelText: 'Package Name (e.g. com.company.app)')),
-                        ],
-                      ),
-                    ),
-                    Step(
-                      title: const Text('App Logo (icon.png)'),
-                      content: ElevatedButton.icon(
-                        onPressed: () {},
-                        icon: const Icon(Icons.image),
-                        label: const Text('Select icon.png from Device'),
-                      ),
-                    ),
-                    Step(
-                      title: const Text('Dart Source Code'),
-                      content: SizedBox(
-                        height: 200,
-                        child: TextField(
-                          maxLines: null,
-                          expands: true,
-                          controller: TextEditingController(text: _dartCodeInput),
-                          onChanged: (val) => _dartCodeInput = val,
-                          decoration: const InputDecoration(
-                            border: OutlineInputBorder(),
-                            hintText: 'Paste or write main.dart code here',
-                          ),
-                          style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
-                        ),
-                      ),
-                    ),
-                    Step(
-                      title: const Text('Review & Compile'),
-                      content: Text('Ready to dispatch GitHub Actions workflow for project: ${_nameController.text} with multi-account auto-failover support!'),
-                    ),
-                  ],
-                ),
-              );
-            }
-          }
-          EOF
-
-      - name: Write Editor Screen (lib/screens/editor_screen.dart)
-        run: |
-          cat << 'EOF' > lib/screens/editor_screen.dart
-          import 'package:flutter/material.dart';
-
-          class EditorScreen extends StatefulWidget {
-            const EditorScreen({super.key});
-
-            @override
-            State<EditorScreen> createState() => _EditorScreenState();
-          }
-
-          class _EditorScreenState extends State<EditorScreen> {
-            final TextEditingController _editorController = TextEditingController(
-              text: "name: Build Flutter APK\non:\n  workflow_dispatch:\n    inputs:\n      project_name:\n        required: true\n",
-            );
-
-            @override
-            Widget build(BuildContext context) {
-              final isDark = Theme.of(context).brightness == Brightness.dark;
-
-              return Scaffold(
-                appBar: AppBar(
-                  title: const Text('Workflow & Code Editor'),
-                  actions: [
-                    IconButton(
-                      icon: const Icon(Icons.save),
-                      onPressed: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Workflow template saved successfully!')),
-                        );
-                      },
-                    ),
-                  ],
-                ),
-                body: Container(
-                  color: isDark ? const Color(0xFF1E1E1E) : Colors.grey[100],
-                  child: TextField(
-                    controller: _editorController,
-                    maxLines: null,
-                    expands: true,
-                    style: TextStyle(
-                      fontFamily: 'monospace',
-                      fontSize: 14,
-                      color: isDark ? Colors.greenAccent : Colors.black87,
-                    ),
-                    decoration: const InputDecoration(
-                      border: InputBorder.none,
-                      contentPadding: EdgeInsets.all(16),
+              ],
+            ),
+            body: ListView(
+              padding: const EdgeInsets.all(16),
+              children: [
+                Card(
+                  child: ListTile(
+                    leading: const Icon(Icons.phone_android, color: Colors.blue, size: 40),
+                    title: const Text('My First Dynamic App'),
+                    subtitle: const Text('Package: com.builder.myfirstapp\\nStatus: Ready to build'),
+                    trailing: IconButton(
+                      icon: const Icon(Icons.play_arrow),
+                      onPressed: () {},
                     ),
                   ),
                 ),
-              );
-            }
-          }
-          EOF
+              ],
+            ),
+            floatingActionButton: FloatingActionButton(
+              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const WizardScreen())),
+              child: const Icon(Icons.add),
+            ),
+          );
+        }
+      }
+      EOF
 
-      - name: Write Settings Screen (lib/screens/settings_screen.dart)
-        run: |
-          cat << 'EOF' > lib/screens/settings_screen.dart
-          import 'package:flutter/material.dart';
+  - name: Write Wizard Screen (lib/screens/wizard_screen.dart)
+    run: |
+      cat << 'EOF' > lib/screens/wizard_screen.dart
+      import 'package:flutter/material.dart';
 
-          class SettingsScreen extends StatefulWidget {
-            const SettingsScreen({super.key});
+      class WizardScreen extends StatefulWidget {
+        const WizardScreen({super.key});
 
-            @override
-            State<SettingsScreen> createState() => _SettingsScreenState();
-          }
+        @override
+        State<WizardScreen> createState() => _WizardScreenState();
+      }
 
-          class _SettingsScreenState extends State<SettingsScreen> {
-            bool _autoFailoverEnabled = true;
+      class _WizardScreenState extends State<WizardScreen> {
+        int _currentStep = 0;
+        final _nameController = TextEditingController(text: 'my_app');
+        final _packageController = TextEditingController(text: 'com.example.myapp');
+        String _dartCodeInput = "import 'package:flutter/material.dart';\\n\\nvoid main() => runApp(MaterialApp(home: Scaffold(body: Center(child: Text('Hello Simple App Builder!')))));";
 
-            @override
-            Widget build(BuildContext context) {
-              return Scaffold(
-                appBar: AppBar(title: const Text('Multi-Account & Settings')),
-                body: ListView(
-                  padding: const EdgeInsets.all(16),
-                  children: [
-                    SwitchListTile(
-                      title: const Text('Auto Failover / Rate Limit Switching'),
-                      subtitle: const Text('Automatically switch to secondary GitHub account if rate limit or auth error occurs.'),
-                      value: _autoFailoverEnabled,
-                      onChanged: (val) => setState(() => _autoFailoverEnabled = val),
+        @override
+        Widget build(BuildContext context) {
+          return Scaffold(
+            appBar: AppBar(title: const Text('New App Project Wizard')),
+            body: Stepper(
+              currentStep: _currentStep,
+              onStepContinue: () {
+                if (_currentStep < 3) {
+                  setState(() => _currentStep += 1);
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Triggering GitHub Actions Compilation...')),
+                  );
+                }
+              },
+              onStepCancel: () {
+                if (_currentStep > 0) setState(() => _currentStep -= 1);
+              },
+              steps: [
+                Step(
+                  title: const Text('Project & Package Name'),
+                  content: Column(
+                    children: [
+                      TextField(controller: _nameController, decoration: const InputDecoration(labelText: 'Project Name (snake_case)')),
+                      const SizedBox(height: 10),
+                      TextField(controller: _packageController, decoration: const InputDecoration(labelText: 'Package Name (e.g. com.company.app)')),
+                    ],
+                  ),
+                ),
+                Step(
+                  title: const Text('App Logo (icon.png)'),
+                  content: ElevatedButton.icon(
+                    onPressed: () {},
+                    icon: const Icon(Icons.image),
+                    label: const Text('Select icon.png from Device'),
+                  ),
+                ),
+                Step(
+                  title: const Text('Dart Source Code'),
+                  content: SizedBox(
+                    height: 200,
+                    child: TextField(
+                      maxLines: null,
+                      expands: true,
+                      controller: TextEditingController(text: _dartCodeInput),
+                      onChanged: (val) => _dartCodeInput = val,
+                      decoration: const InputDecoration(
+                        border: OutlineInputBorder(),
+                        hintText: 'Paste or write main.dart code here',
+                      ),
+                      style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
                     ),
-                    const Divider(),
-                    const Text('Configured Accounts', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                    const ListTile(
-                      leading: Icon(Icons.account_circle),
+                  ),
+                ),
+                Step(
+                  title: const Text('Review & Compile'),
+                  content: Text('Ready to dispatch GitHub Actions workflow for project: ${_nameController.text} with multi-account auto-failover support!'),
+                ),
+              ],
+            ),
+          );
+        }
+      }
+      EOF
+
+  - name: Write Editor Screen (lib/screens/editor_screen.dart)
+    run: |
+      cat << 'EOF' > lib/screens/editor_screen.dart
+      import 'package:flutter/material.dart';
+
+      class EditorScreen extends StatefulWidget {
+        const EditorScreen({super.key});
+
+        @override
+        State<EditorScreen> createState() => _EditorScreenState();
+      }
+
+      class _EditorScreenState extends State<EditorScreen> {
+        final TextEditingController _editorController = TextEditingController(
+          text: "name: Build Flutter APK\\non:\\n  workflow_dispatch:\\n    inputs:\\n      project_name:\\n        required: true\\n",
+        );
+
+        @override
+        Widget build(BuildContext context) {
+          final isDark = Theme.of(context).brightness == Brightness.dark;
+
+          return Scaffold(
+            appBar: AppBar(
+              title: const Text('Workflow & Code Editor'),
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.save),
+                  onPressed: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Workflow template saved successfully!')),
+                    );
+                  },
+                ),
+              ],
+            ),
+            body: Container(
+              color: isDark ? const Color(0xFF1E1E1E) : Colors.grey[100],
+              child: TextField(
+                controller: _editorController,
+                maxLines: null,
+                expands: true,
+                style: TextStyle(
+                  fontFamily: 'monospace',
+                  fontSize: 14,
+                  color: isDark ? Colors.greenAccent : Colors.black87,
+                ),
+                decoration: const InputDecoration(
+                  border: InputBorder.none,
+                  contentPadding: EdgeInsets.all(16),
+                ),
+              ),
+            ),
+          );
+        }
+      }
+      EOF
+
+  - name: Write Settings Screen (lib/screens/settings_screen.dart)
+    run: |
+      cat << 'EOF' > lib/screens/settings_screen.dart
+      import 'package:flutter/material.dart';
+
+      class SettingsScreen extends StatefulWidget {
+        const SettingsScreen({super.key});
+
+        @override
+        State<SettingsScreen> createState() => _SettingsScreenState();
+      }
+
+      class _SettingsScreenState extends State<SettingsScreen> {
+        bool _autoFailoverEnabled = true;
+
+        @override
+        Widget build(BuildContext context) {
+          return Scaffold(
+            appBar: AppBar(title: const Text('Multi-Account & Settings')),
+            body: ListView(
+              padding: const EdgeInsets.all(16),
+              children: [
+                SwitchListTile(
+                  title: const Text('Auto Failover / Rate Limit Switching'),
+                  subtitle: const Text('Automatically switch to secondary GitHub account if rate limit or auth error occurs.'),
+                  value: _autoFailoverEnabled,
+                  onChanged: (val) => setState(() => _autoFailoverEnabled = val),
+                ),
+                const Divider(),
+                const Text('Configured Accounts', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                const ListTile(
+                  leading: Icon(Icons.account_circle),
+                  title: Text('primary_user (Main Token)'),
+                  subtitle: Text('Repo: user/simple-app-builder'),
+                  trailing: Icon(Icons.check_circle, color: Colors.green),
+                ),
+                ElevatedButton.icon(
+                  onPressed: () {},
+                  icon: const Icon(Icons.add),
+                  label: const Text('Add Secondary GitHub Account'),
+                ),
+              ],
+            ),
+          );
+        }
+      }
+      EOF
+
+  - name: Write main.dart (lib/main.dart)
+    run: |
+      cat << 'EOF' > lib/main.dart
+      import 'package:flutter/material.dart';
+      import 'screens/setup_screen.dart';
+
+      void main() {
+        runApp(const SimpleAppBuilderApp());
+      }
+
+      class SimpleAppBuilderApp extends StatelessWidget {
+        const SimpleAppBuilderApp({super.key});
+
+        @override
+        Widget build(BuildContext context) {
+          return MaterialApp(
+            title: 'Simple App Builder',
+            themeMode: ThemeMode.system,
+            theme: ThemeData(
+              useMaterial3: true,
+              colorSchemeSeed: Colors.deepPurple,
+              brightness: Brightness.light,
+            ),
+            darkTheme: ThemeData(
+              useMaterial3: true,
+              colorSchemeSeed: Colors.deepPurple,
+              brightness: Brightness.dark,
+            ),
+            home: const SetupScreen(),
+            debugShowCheckedModeBanner: false,
+          );
+        }
+      }
+      EOF
+
+  - name: Setup Custom App Launcher Icon if exists
+    run: |
+      ICON_PATH="icon.png"
+      TARGET_DIR="android/app/src/main/res/mipmap-xxhdpi"
+      if [ -f "$ICON_PATH" ]; then
+        echo "Custom icon found. Copying..."
+        mkdir -p "$TARGET_DIR"
+        cp "$ICON_PATH" "$TARGET_DIR/ic_launcher.png"
+      fi
+
+  - name: Build Release APK
+    run: |
+      flutter pub get
+      flutter build apk --release
+
+  - name: Upload APK Artifact
+    uses: actions/upload-artifact@v4
+    with:
+      name: simple-app-builder-apk
+      path: "**/build/app/outputs/flutter-apk/app-release.apk"
+      if-no-files-found: error
