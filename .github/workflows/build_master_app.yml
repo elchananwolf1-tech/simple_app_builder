@@ -35,9 +35,12 @@ steps:
       channel: 'stable'
       cache: true
 
+  - name: Accept Android Licenses
+    run: yes "y" | flutter doctor --android-licenses
+
   - name: Scaffold Flutter Project & Directories
     run: |
-      flutter create . --org ${{ inputs.package_name }} --project-name${{ inputs.project_name }} --platforms=android
+      flutter create . --org ${{ inputs.package_name }} --project-name${{ inputs.project_name }} --platforms=android --overwrite
       mkdir -p lib/models lib/services lib/screens
 
   - name: Write pubspec.yaml
@@ -218,11 +221,11 @@ steps:
                       Padding(
                         padding: const EdgeInsets.all(8.0),
                         child: Text(
-                          '1. Go to GitHub Settings -> Developer Settings -> Personal Access Tokens -> Tokens (classic).\\n'
-                          '2. Generate new token (classic).\\n'
-                          '3. Explicitly check the following scopes:\\n'
-                          '   - repo (Full control of private repositories)\\n'
-                          '   - workflow (Update GitHub Action workflows)\\n'
+                          '1. Go to GitHub Settings -> Developer Settings -> Personal Access Tokens -> Tokens (classic).\n'
+                          '2. Generate new token (classic).\n'
+                          '3. Explicitly check the following scopes:\n'
+                          '   - repo (Full control of private repositories)\n'
+                          '   - workflow (Update GitHub Action workflows)\n'
                           '4. Copy the generated token and paste it below.',
                           style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.secondary),
                         ),
@@ -297,7 +300,7 @@ steps:
                   child: ListTile(
                     leading: const Icon(Icons.phone_android, color: Colors.blue, size: 40),
                     title: const Text('My First Dynamic App'),
-                    subtitle: const Text('Package: com.builder.myfirstapp\\nStatus: Ready to build'),
+                    subtitle: const Text('Package: com.builder.myfirstapp\nStatus: Ready to build'),
                     trailing: IconButton(
                       icon: const Icon(Icons.play_arrow),
                       onPressed: () {},
@@ -331,7 +334,7 @@ steps:
         int _currentStep = 0;
         final _nameController = TextEditingController(text: 'my_app');
         final _packageController = TextEditingController(text: 'com.example.myapp');
-        String _dartCodeInput = "import 'package:flutter/material.dart';\\n\\nvoid main() => runApp(MaterialApp(home: Scaffold(body: Center(child: Text('Hello Simple App Builder!')))));";
+        String _dartCodeInput = "import 'package:flutter/material.dart';\n\nvoid main() => runApp(MaterialApp(home: Scaffold(body: Center(child: Text('Hello Simple App Builder!')))));";
 
         @override
         Widget build(BuildContext context) {
@@ -412,7 +415,7 @@ steps:
 
       class _EditorScreenState extends State<EditorScreen> {
         final TextEditingController _editorController = TextEditingController(
-          text: "name: Build Flutter APK\\non:\\n  workflow_dispatch:\\n    inputs:\\n      project_name:\\n        required: true\\n",
+          text: "name: Build Flutter APK\non:\n  workflow_dispatch:\n    inputs:\n      project_name:\n        required: true\n",
         );
 
         @override
